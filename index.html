@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Mini Minecraft Mobile Visible</title>
+<title>Mini Minecraft Mobile Collision Fix</title>
 <style>
 body { margin: 0; overflow: hidden; touch-action: none; }
 canvas { display: block; }
@@ -64,8 +64,7 @@ function init(){
     scene.background = new THREE.Color(0x87ceeb);
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    camera.position.set(0, playerHeight + 50, 5); // spawn 10 blocks above ground
-
+    camera.position.set(0, playerHeight + 5, 5); // spawn 5 blocks above ground
     camera.rotation.x = -0.3; // slightly look down
 
     renderer = new THREE.WebGLRenderer({antialias:true});
@@ -166,16 +165,19 @@ function animate(){
     velocity.y -= 0.01;
     camera.position.y += velocity.y;
 
-    // Collision
+    // Collision (vertical)
+    const playerBottom = camera.position.y - playerHeight/2;
     canJump = false;
     for(let block of world){
         const dx = Math.abs(camera.position.x - block.position.x);
         const dz = Math.abs(camera.position.z - block.position.z);
-        const dy = camera.position.y - (block.position.y + blockSize/2);
-        if(dx < 0.5 && dz < 0.5 && dy < playerHeight && dy > 0){
-            camera.position.y = block.position.y + playerHeight/2 + 0.01;
-            velocity.y = 0;
-            canJump = true;
+        if(dx < 0.5 && dz < 0.5){
+            const blockTop = block.position.y + blockSize/2;
+            if(playerBottom <= blockTop && playerBottom >= blockTop - 0.1 && velocity.y <= 0){
+                camera.position.y = blockTop + playerHeight/2 + 0.01;
+                velocity.y = 0;
+                canJump = true;
+            }
         }
     }
 
