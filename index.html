@@ -80,6 +80,15 @@ button("↑","80px","120px",()=>move.f=1,()=>move.f=0);
 button("↓","80px","20px",()=>move.b=1,()=>move.b=0);
 button("←","20px","70px",()=>move.l=1,()=>move.l=0);
 button("→","140px","70px",()=>move.r=1,()=>move.r=0);
+button("⤒","300px","70px",
+  ()=>{
+    if(canJump){
+      velocityY = 0.35;
+      canJump = false;
+    }
+  },
+  ()=>{}
+);
 
 /* ---------- GAME LOOP ---------- */
 function animate(){
