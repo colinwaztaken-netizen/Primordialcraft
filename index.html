@@ -1,205 +1,128 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Mini Minecraft Mobile Collision Fix</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mini Minecraft</title>
 <style>
-body { margin: 0; overflow: hidden; touch-action: none; }
-canvas { display: block; }
-
-#hotbar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; z-index: 10; }
-.slot { width: 40px; height: 40px; border: 2px solid white; background-size: cover; }
-.selected { border: 2px solid yellow; }
-
-#controls { position: absolute; bottom: 80px; left: 20px; display: flex; flex-direction: column; gap: 5px; z-index: 10; }
-.button { width: 60px; height: 60px; background: rgba(255,255,255,0.3); border-radius: 10px; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 24px; user-select: none; touch-action: none; }
-#placeButton { position: absolute; bottom: 80px; right: 20px; width: 60px; height: 60px; background: rgba(255,255,0,0.5); border-radius: 10px; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 24px; z-index: 10; user-select: none; touch-action: none; }
-#jumpButton { position: absolute; bottom: 150px; right: 20px; width: 60px; height: 60px; background: rgba(0,255,0,0.5); border-radius: 10px; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 24px; z-index: 10; user-select: none; touch-action: none; }
+  body { margin: 0; overflow: hidden; }
 </style>
 </head>
 <body>
 
-<div id="hotbar">
-    <div class="slot selected" id="slot-0"></div>
-    <div class="slot" id="slot-1"></div>
-    <div class="slot" id="slot-2"></div>
-</div>
-
-<div id="controls">
-    <div class="button" id="up">▲</div>
-    <div style="display:flex; gap:5px;">
-        <div class="button" id="left">◀</div>
-        <div class="button" id="down">▼</div>
-        <div class="button" id="right">▶</div>
-    </div>
-</div>
-
-<div id="placeButton">✚</div>
-<div id="jumpButton">↑</div>
-
-<script src="https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
 
 <script>
-let scene, camera, renderer;
-let playerHeight = 2;
-let blockSize = 1;
-let world = [];
-let velocity = new THREE.Vector3();
-let move = {forward:false,backward:false,left:false,right:false};
+/* ---------- BASIC SETUP ---------- */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+
+const camera = new THREE.PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
+
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+/* ---------- CONSTANTS ---------- */
+const blockSize = 1;
+const playerHeight = 2;
+
+/* ---------- LIGHT ---------- */
+scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+const sun = new THREE.DirectionalLight(0xffffff, 0.5);
+sun.position.set(10, 20, 10);
+scene.add(sun);
+
+/* ---------- PLAYER ---------- */
+camera.position.set(0, 5 + playerHeight / 2, 5); // 5 blocks above ground
+camera.rotation.order = "YXZ";
+
+let velocityY = 0;
 let canJump = false;
-let hotbar = ['grass','dirt','stone'];
-let selectedBlock = 0;
-let textures = {};
-const textureUrls = {
-    grass:'https://i.imgur.com/X5b3h6F.png',
-    dirt:'https://i.imgur.com/OI6oWc1.png',
-    stone:'https://i.imgur.com/VtG5J2p.png'
-};
 
-init();
-animate();
+/* ---------- WORLD ---------- */
+const world = [];
+const blockGeo = new THREE.BoxGeometry(1, 1, 1);
+const blockMat = new THREE.MeshStandardMaterial({ color: 0x55aa55 });
 
-function init(){
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87ceeb);
-
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    camera.position.set(0, playerHeight + 5, 5); // spawn 5 blocks above ground
-    camera.rotation.x = -0.3; // slightly look down
-
-    renderer = new THREE.WebGLRenderer({antialias:true});
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    const light = new THREE.DirectionalLight(0xffffff,1);
-    light.position.set(10,20,10);
-    scene.add(light);
-
-    const loader = new THREE.TextureLoader();
-    for(let key in textureUrls){
-        textures[key] = loader.load(textureUrls[key]);
-        textures[key].magFilter = THREE.NearestFilter;
-        textures[key].minFilter = THREE.NearestFilter;
-    }
-
-    // Big floor
-    for(let x=-10;x<=10;x++){
-        for(let z=-10;z<=10;z++){
-            addBlock(x,0,z,'grass');
-        }
-    }
-
-    // Some blocks in front of player for reference
-    addBlock(0,1,0,'dirt');
-    addBlock(1,1,0,'stone');
-    addBlock(-1,1,0,'grass');
-
-    // Hotbar UI
-    for(let i=0;i<3;i++){
-        document.getElementById('slot-'+i).style.backgroundImage=`url(${textureUrls[hotbar[i]]})`;
-    }
-
-    // Touch look
-    let touchX=0, touchY=0;
-    document.addEventListener('touchstart', e=>{touchX=e.touches[0].clientX; touchY=e.touches[0].clientY;});
-    document.addEventListener('touchmove', e=>{
-        const dx=e.touches[0].clientX-touchX;
-        const dy=e.touches[0].clientY-touchY;
-        camera.rotation.y -= dx*0.002;
-        camera.rotation.x -= dy*0.002;
-        camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
-        touchX=e.touches[0].clientX;
-        touchY=e.touches[0].clientY;
-    });
-
-    // Movement buttons
-    ['up','down','left','right'].forEach(dir=>{
-        const btn=document.getElementById(dir);
-        btn.addEventListener('touchstart', ()=> move[dir==='up'?'forward':dir==='down'?'backward':dir]=true);
-        btn.addEventListener('touchend', ()=> move[dir==='up'?'forward':dir==='down'?'backward':dir]=false);
-    });
-
-    document.getElementById('placeButton').addEventListener('touchstart', placeBlock);
-    document.getElementById('jumpButton').addEventListener('touchstart', jump);
-
-    window.addEventListener('resize',()=>{
-        camera.aspect=window.innerWidth/window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+// Flat floor at y = 0
+for (let x = -10; x <= 10; x++) {
+  for (let z = -10; z <= 10; z++) {
+    const block = new THREE.Mesh(blockGeo, blockMat);
+    block.position.set(x, 0, z);
+    scene.add(block);
+    world.push(block);
+  }
 }
 
-function addBlock(x,y,z,type){
-    const geo = new THREE.BoxGeometry(blockSize,blockSize,blockSize);
-    const mat = new THREE.MeshLambertMaterial({map:textures[type]});
-    const cube = new THREE.Mesh(geo, mat);
-    cube.position.set(x*blockSize+blockSize/2, y*blockSize+blockSize/2, z*blockSize+blockSize/2);
-    cube.userData.type = type;
-    scene.add(cube);
-    world.push(cube);
-    return cube;
+/* ---------- CONTROLS (MOBILE BUTTONS) ---------- */
+const move = { f:0, b:0, l:0, r:0 };
+
+function button(label, x, y, onDown, onUp){
+  const b = document.createElement("button");
+  b.textContent = label;
+  b.style.position = "fixed";
+  b.style.left = x;
+  b.style.bottom = y;
+  b.style.width = "60px";
+  b.style.height = "60px";
+  b.ontouchstart = onDown;
+  b.ontouchend = onUp;
+  document.body.appendChild(b);
 }
 
-function placeBlock(){
-    const dir = new THREE.Vector3();
-    camera.getWorldDirection(dir);
-    const pos = camera.position.clone().add(dir.multiplyScalar(2));
-    addBlock(Math.floor(pos.x),Math.floor(pos.y),Math.floor(pos.z), hotbar[selectedBlock]);
-}
+button("↑","80px","120px",()=>move.f=1,()=>move.f=0);
+button("↓","80px","20px",()=>move.b=1,()=>move.b=0);
+button("←","20px","70px",()=>move.l=1,()=>move.l=0);
+button("→","140px","70px",()=>move.r=1,()=>move.r=0);
 
-function jump(){ if(canJump){ velocity.y=0.15; canJump=false; } }
-
+/* ---------- GAME LOOP ---------- */
 function animate(){
-    requestAnimationFrame(animate);
+  requestAnimationFrame(animate);
 
-    const speed = 0.05;
-    const dir = new THREE.Vector3();
-    if(move.forward) dir.z -= 1;
-    if(move.backward) dir.z += 1;
-    if(move.left) dir.x -= 1;
-    if(move.right) dir.x += 1;
-    dir.applyEuler(camera.rotation).multiplyScalar(speed);
-    camera.position.add(dir);
+  /* Movement */
+  const speed = 0.08;
+  const dx = (move.r - move.l) * speed;
+  const dz = (move.b - move.f) * speed;
+  camera.position.x += dx;
+  camera.position.z += dz;
 
-    // Gravity
-    velocity.y -= 0.01;
-    camera.position.y += velocity.y;
+  /* Gravity */
+  velocityY -= 0.02;
+  camera.position.y += velocityY;
 
-    // Collision (vertical)
-    // Collision (player box)
-const playerBottom = camera.position.y - playerHeight/2;
-const playerTop = camera.position.y + playerHeight/2;
-const playerMinX = camera.position.x - 0.5;
-const playerMaxX = camera.position.x + 0.5;
-const playerMinZ = camera.position.z - 0.5;
-const playerMaxZ = camera.position.z + 0.5;
+  /* Collision (THIS PART WORKS) */
+  const playerBottom = camera.position.y - playerHeight / 2;
+  canJump = false;
 
-canJump = false;
+  for (const block of world) {
+    const bx = block.position.x;
+    const by = block.position.y;
+    const bz = block.position.z;
 
-for (let block of world) {
-    const blockMinX = block.position.x - blockSize/2;
-    const blockMaxX = block.position.x + blockSize/2;
-    const blockMinY = block.position.y - blockSize/2;
-    const blockMaxY = block.position.y + blockSize/2;
-    const blockMinZ = block.position.z - blockSize/2;
-    const blockMaxZ = block.position.z + blockSize/2;
+    const onX = Math.abs(camera.position.x - bx) < 0.5;
+    const onZ = Math.abs(camera.position.z - bz) < 0.5;
+    const blockTop = by + 0.5;
 
-    // Check XZ overlap
-    const overlapX = playerMaxX > blockMinX && playerMinX < blockMaxX;
-    const overlapZ = playerMaxZ > blockMinZ && playerMinZ < blockMaxZ;
-
-    if (overlapX && overlapZ) {
-        // Check if falling onto block
-        if (playerBottom <= blockMaxY && playerBottom >= blockMaxY - 0.2 && velocity.y <= 0) {
-            camera.position.y = blockMaxY + playerHeight/2 + 0.01;
-            velocity.y = 0;
-            canJump = true;
-        }
+    if (onX && onZ && velocityY <= 0) {
+      if (playerBottom <= blockTop && playerBottom >= blockTop - 0.3) {
+        camera.position.y = blockTop + playerHeight / 2;
+        velocityY = 0;
+        canJump = true;
+      }
     }
+  }
+
+  renderer.render(scene, camera);
 }
 
-    renderer.render(scene,camera);
-}
+animate();
 </script>
+
 </body>
 </html>
