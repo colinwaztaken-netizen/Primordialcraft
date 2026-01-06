@@ -2,75 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Mini Minecraft Mobile + Jump</title>
+<title>Mini Minecraft Mobile Fix</title>
 <style>
-    body { margin: 0; overflow: hidden; touch-action: none; }
-    canvas { display: block; }
+body { margin: 0; overflow: hidden; touch-action: none; }
+canvas { display: block; }
+#hotbar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; z-index: 10; }
+.slot { width: 40px; height: 40px; border: 2px solid white; background-size: cover; }
+.selected { border: 2px solid yellow; }
 
-    #hotbar {
-        position: absolute;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        display: flex;
-        gap: 5px;
-        z-index: 10;
-    }
-    .slot {
-        width: 40px;
-        height: 40px;
-        border: 2px solid white;
-        background-size: cover;
-    }
-    .selected { border: 2px solid yellow; }
-
-    #controls {
-        position: absolute;
-        bottom: 80px;
-        left: 20px;
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-        z-index: 10;
-    }
-    .button { 
-        width: 60px; height: 60px; 
-        background: rgba(255,255,255,0.3); 
-        border-radius: 10px; 
-        display: flex; justify-content: center; align-items: center; 
-        font-weight: bold; font-size: 24px;
-        user-select: none; touch-action: none;
-    }
-    #placeButton {
-        position: absolute;
-        bottom: 80px;
-        right: 20px;
-        width: 60px; height: 60px;
-        background: rgba(255,255,0,0.5);
-        border-radius: 10px;
-        display: flex; justify-content: center; align-items: center;
-        font-weight: bold; font-size: 24px;
-        z-index: 10;
-        user-select: none;
-        touch-action: none;
-    }
-    #jumpButton {
-        position: absolute;
-        bottom: 150px;
-        right: 20px;
-        width: 60px; height: 60px;
-        background: rgba(0,255,0,0.5);
-        border-radius: 10px;
-        display: flex; justify-content: center; align-items: center;
-        font-weight: bold; font-size: 24px;
-        z-index: 10;
-        user-select: none;
-        touch-action: none;
-    }
+#controls { position: absolute; bottom: 80px; left: 20px; display: flex; flex-direction: column; gap: 5px; z-index: 10; }
+.button { width: 60px; height: 60px; background: rgba(255,255,255,0.3); border-radius: 10px; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 24px; user-select: none; touch-action: none; }
+#placeButton { position: absolute; bottom: 80px; right: 20px; width: 60px; height: 60px; background: rgba(255,255,0,0.5); border-radius: 10px; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 24px; z-index: 10; user-select: none; touch-action: none; }
+#jumpButton { position: absolute; bottom: 150px; right: 20px; width: 60px; height: 60px; background: rgba(0,255,0,0.5); border-radius: 10px; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 24px; z-index: 10; user-select: none; touch-action: none; }
 </style>
 </head>
 <body>
-
 <div id="hotbar">
     <div class="slot selected" id="slot-0"></div>
     <div class="slot" id="slot-1"></div>
@@ -90,21 +36,17 @@
 <div id="jumpButton">↑</div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.157.0/examples/js/controls/PointerLockControls.js"></script>
 
 <script>
-let scene, camera, renderer, controls;
+let scene, camera, renderer;
 let playerHeight = 2;
 let blockSize = 1;
 let world = [];
-let raycaster = new THREE.Raycaster();
-let hotbar = ['grass','dirt','stone'];
-let selectedBlock = 0;
 let velocity = new THREE.Vector3();
 let move = {forward:false,backward:false,left:false,right:false};
 let canJump = false;
-
-// Textures
+let hotbar = ['grass','dirt','stone'];
+let selectedBlock = 0;
 let textures = {};
 const textureUrls = {
     grass:'https://i.imgur.com/X5b3h6F.png',
@@ -120,29 +62,26 @@ function init(){
     scene.background = new THREE.Color(0x87ceeb);
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    camera.position.y = playerHeight;
+    camera.position.set(0,playerHeight,5);
 
     renderer = new THREE.WebGLRenderer({antialias:true});
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    const loader = new THREE.TextureLoader();
-    for(let key in textureUrls){
-        textures[key]=loader.load(textureUrls[key]);
-        textures[key].magFilter=THREE.NearestFilter;
-        textures[key].minFilter=THREE.NearestFilter;
-    }
-
     const light = new THREE.DirectionalLight(0xffffff,1);
     light.position.set(10,20,10);
     scene.add(light);
 
-    controls = new THREE.PointerLockControls(camera, renderer.domElement);
-    document.body.addEventListener('click', ()=>{ controls.lock(); });
+    const loader = new THREE.TextureLoader();
+    for(let key in textureUrls){
+        textures[key] = loader.load(textureUrls[key]);
+        textures[key].magFilter = THREE.NearestFilter;
+        textures[key].minFilter = THREE.NearestFilter;
+    }
 
-    // Floor
-    for(let x=-5;x<=5;x++){
-        for(let z=-5;z<=5;z++){
+    // Make a visible floor
+    for(let x=-10;x<=10;x++){
+        for(let z=-10;z<=10;z++){
             addBlock(x,0,z,'grass');
         }
     }
@@ -153,94 +92,78 @@ function init(){
     }
 
     // Touch look
-    let touchX=0,touchY=0;
-    document.addEventListener('touchstart', e=>{ touchX=e.touches[0].clientX; touchY=e.touches[0].clientY; });
-    document.addEventListener('touchmove', e=>{
+    let touchX=0, touchY=0;
+    document.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX; touchY=e.touches[0].clientY;});
+    document.addEventListener('touchmove',e=>{
         const dx=e.touches[0].clientX-touchX;
         const dy=e.touches[0].clientY-touchY;
         camera.rotation.y -= dx*0.002;
         camera.rotation.x -= dy*0.002;
-        camera.rotation.x=Math.max(-Math.PI/2,Math.min(Math.PI/2,camera.rotation.x));
+        camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
         touchX=e.touches[0].clientX;
         touchY=e.touches[0].clientY;
     });
 
-    // Mobile movement buttons
+    // Movement buttons
     ['up','down','left','right'].forEach(dir=>{
         const btn=document.getElementById(dir);
-        btn.addEventListener('touchstart', ()=>move[dir==='up'?'forward':dir==='down'?'backward':dir]=true);
-        btn.addEventListener('touchend', ()=>move[dir==='up'?'forward':dir==='down'?'backward':dir]=false);
+        btn.addEventListener('touchstart', ()=> move[dir==='up'?'forward':dir==='down'?'backward':dir]=true);
+        btn.addEventListener('touchend', ()=> move[dir==='up'?'forward':dir==='down'?'backward':dir]=false);
     });
 
     document.getElementById('placeButton').addEventListener('touchstart', placeBlock);
     document.getElementById('jumpButton').addEventListener('touchstart', jump);
 
-    window.addEventListener('resize', ()=>{
+    window.addEventListener('resize',()=>{
         camera.aspect=window.innerWidth/window.innerHeight;
         camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth,window.innerHeight);
+        renderer.setSize(window.innerWidth, window.innerHeight);
     });
 }
 
 function addBlock(x,y,z,type){
-    const geometry = new THREE.BoxGeometry(blockSize,blockSize,blockSize);
-    const material = new THREE.MeshLambertMaterial({map:textures[type]});
-    const cube = new THREE.Mesh(geometry, material);
+    const geo = new THREE.BoxGeometry(blockSize,blockSize,blockSize);
+    const mat = new THREE.MeshLambertMaterial({map:textures[type]});
+    const cube = new THREE.Mesh(geo, mat);
     cube.position.set(x*blockSize+blockSize/2, y*blockSize+blockSize/2, z*blockSize+blockSize/2);
-    cube.userData.type=type;
+    cube.userData.type = type;
     scene.add(cube);
     world.push(cube);
     return cube;
 }
 
-function breakBlock(){
-    raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-    const intersects=raycaster.intersectObjects(world);
-    if(intersects.length>0){
-        const target=intersects[0].object;
-        scene.remove(target);
-        world=world.filter(b=>b!==target);
-    }
-}
-
 function placeBlock(){
-    raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-    const intersects=raycaster.intersectObjects(world);
-    if(intersects.length>0){
-        const target=intersects[0].object;
-        const normal=intersects[0].face.normal;
-        const pos=target.position.clone().add(normal.clone().multiplyScalar(blockSize));
-        addBlock(pos.x,pos.y,pos.z, hotbar[selectedBlock]);
-    }
+    // Place block in front of camera
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    const pos = camera.position.clone().add(dir.multiplyScalar(2));
+    addBlock(Math.floor(pos.x),Math.floor(pos.y),Math.floor(pos.z), hotbar[selectedBlock]);
 }
 
-function jump(){
-    if(canJump){ velocity.y=0.15; canJump=false; }
-}
+function jump(){ if(canJump){ velocity.y=0.15; canJump=false; } }
 
 function animate(){
     requestAnimationFrame(animate);
 
-    // Movement
-    const speed=0.05;
-    const dir=new THREE.Vector3();
-    if(move.forward) dir.z-=1;
-    if(move.backward) dir.z+=1;
-    if(move.left) dir.x-=1;
-    if(move.right) dir.x+=1;
+    const speed = 0.05;
+    const dir = new THREE.Vector3();
+    if(move.forward) dir.z -= 1;
+    if(move.backward) dir.z += 1;
+    if(move.left) dir.x -= 1;
+    if(move.right) dir.x += 1;
     dir.applyEuler(camera.rotation).multiplyScalar(speed);
     camera.position.add(dir);
 
-    // Gravity & collision
+    // Gravity
     velocity.y -= 0.01;
     camera.position.y += velocity.y;
 
+    // Collision
     canJump = false;
     for(let block of world){
         const dx = Math.abs(camera.position.x - block.position.x);
-        const dy = camera.position.y - block.position.y;
         const dz = Math.abs(camera.position.z - block.position.z);
-
+        const dy = camera.position.y - (block.position.y + blockSize/2);
         if(dx < 0.5 && dz < 0.5 && dy < playerHeight && dy > 0){
             camera.position.y = block.position.y + playerHeight/2 + 0.01;
             velocity.y = 0;
@@ -253,4 +176,3 @@ function animate(){
 </script>
 </body>
 </html>
-
