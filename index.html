@@ -2,10 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Mini Minecraft Mobile Fix</title>
+<title>Mini Minecraft Mobile Visible</title>
 <style>
 body { margin: 0; overflow: hidden; touch-action: none; }
 canvas { display: block; }
+
 #hotbar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; z-index: 10; }
 .slot { width: 40px; height: 40px; border: 2px solid white; background-size: cover; }
 .selected { border: 2px solid yellow; }
@@ -17,6 +18,7 @@ canvas { display: block; }
 </style>
 </head>
 <body>
+
 <div id="hotbar">
     <div class="slot selected" id="slot-0"></div>
     <div class="slot" id="slot-1"></div>
@@ -62,7 +64,8 @@ function init(){
     scene.background = new THREE.Color(0x87ceeb);
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    camera.position.set(0,playerHeight,5);
+    camera.position.set(0, playerHeight+1, 5);
+    camera.rotation.x = -0.3; // slightly look down
 
     renderer = new THREE.WebGLRenderer({antialias:true});
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -79,22 +82,27 @@ function init(){
         textures[key].minFilter = THREE.NearestFilter;
     }
 
-    // Make a visible floor
+    // Big floor
     for(let x=-10;x<=10;x++){
         for(let z=-10;z<=10;z++){
             addBlock(x,0,z,'grass');
         }
     }
 
-    // Hotbar
+    // Some blocks in front of player for reference
+    addBlock(0,1,0,'dirt');
+    addBlock(1,1,0,'stone');
+    addBlock(-1,1,0,'grass');
+
+    // Hotbar UI
     for(let i=0;i<3;i++){
         document.getElementById('slot-'+i).style.backgroundImage=`url(${textureUrls[hotbar[i]]})`;
     }
 
     // Touch look
     let touchX=0, touchY=0;
-    document.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX; touchY=e.touches[0].clientY;});
-    document.addEventListener('touchmove',e=>{
+    document.addEventListener('touchstart', e=>{touchX=e.touches[0].clientX; touchY=e.touches[0].clientY;});
+    document.addEventListener('touchmove', e=>{
         const dx=e.touches[0].clientX-touchX;
         const dy=e.touches[0].clientY-touchY;
         camera.rotation.y -= dx*0.002;
@@ -133,7 +141,6 @@ function addBlock(x,y,z,type){
 }
 
 function placeBlock(){
-    // Place block in front of camera
     const dir = new THREE.Vector3();
     camera.getWorldDirection(dir);
     const pos = camera.position.clone().add(dir.multiplyScalar(2));
