@@ -2,157 +2,172 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Mini Minecraft Prototype 1</title>
+<meta name="viewport"
+  content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Primordialcraft Prototype</title>
 <style>
-  body { margin: 0; overflow: hidden; touch-action: none; }
-  canvas { display: block; }
+  body { margin:0; overflow:hidden; touch-action:none; }
+  button {
+    position:fixed;
+    width:60px; height:60px;
+    font-size:20px;
+    opacity:0.7;
+  }
 </style>
 </head>
 <body>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-
 <script>
-/* ---------- SETUP ---------- */
+/* ================== SETUP ================== */
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({antialias:true});
+const camera = new THREE.PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-const ambient = new THREE.AmbientLight(0xffffff,0.8);
-scene.add(ambient);
-const sun = new THREE.DirectionalLight(0xffffff,0.5);
+/* ================== LIGHT ================== */
+scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+const sun = new THREE.DirectionalLight(0xffffff, 0.6);
 sun.position.set(10,20,10);
 scene.add(sun);
 
-/* ---------- CONSTANTS ---------- */
-const blockSize = 1;
-const playerHeight = 2;
-const playerSize = 1;
+/* ================== CONSTANTS ================== */
+const BLOCK = 1;
+const PLAYER_HEIGHT = 2;
 
-/* ---------- WORLD ---------- */
+/* ================== WORLD ================== */
 const world = [];
-const blockGeo = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+const blockGeo = new THREE.BoxGeometry(1,1,1);
+const blockMat = new THREE.MeshStandardMaterial({ color:0x55aa55 });
 
-// Simple green floor
-for(let x=-10;x<=10;x++){
-  for(let z=-10;z<=10;z++){
-    const mat = new THREE.MeshStandardMaterial({color:0x55aa55});
-    const block = new THREE.Mesh(blockGeo, mat);
-    block.position.set(x,0,z);
-    scene.add(block);
-    world.push(block);
+for(let x=-15;x<=15;x++){
+  for(let z=-15;z<=15;z++){
+    const b = new THREE.Mesh(blockGeo, blockMat);
+    b.position.set(x,0,z);
+    scene.add(b);
+    world.push(b);
   }
 }
 
-/* ---------- PLAYER MODEL ---------- */
-const playerGeo = new THREE.BoxGeometry(playerSize,playerHeight,playerSize);
-const playerMat = new THREE.MeshStandardMaterial({color:0xff0000});
-const player = new THREE.Mesh(playerGeo,playerMat);
+/* ================== PLAYER ================== */
+// Player physics body (red cube)
+const player = new THREE.Mesh(
+  new THREE.BoxGeometry(1,2,1),
+  new THREE.MeshStandardMaterial({ color:0xff0000 })
+);
+player.position.set(0, 5 + PLAYER_HEIGHT/2, 5);
 scene.add(player);
 
-// Spawn 5 blocks above ground
-player.position.set(0, 5 + playerHeight/2, 5);
-camera.position.set(0, player.position.y + playerHeight/2 - 0.1, 5); // camera at eye height
+// Camera rig (yaw → pitch → camera)
+const yawObject = new THREE.Object3D();
+const pitchObject = new THREE.Object3D();
+yawObject.add(pitchObject);
+pitchObject.add(camera);
+scene.add(yawObject);
 
-let velocity = new THREE.Vector3();
+camera.position.y = PLAYER_HEIGHT/2 - 0.1;
+
+/* ================== INPUT ================== */
+const move = { f:0, b:0, l:0, r:0 };
+let velocityY = 0;
 let canJump = false;
-const move = {f:0,b:0,l:0,r:0};
-let yaw = 0;
-let pitch = 0;
 
-/* ---------- TOUCH CAMERA ---------- */
-let touchX=0, touchY=0;
-document.addEventListener("touchstart", e => {
-  touchX = e.touches[0].clientX;
-  touchY = e.touches[0].clientY;
-});
-document.addEventListener("touchmove", e => {
-  const dx = e.touches[0].clientX - touchX;
-  const dy = e.touches[0].clientY - touchY;
-  touchX = e.touches[0].clientX;
-  touchY = e.touches[0].clientY;
-
-  yaw -= dx * 0.003;
-  pitch -= dy * 0.003;
-  pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
-  player.rotation.y = yaw;
-  camera.rotation.x = pitch;
-});
-
-/* ---------- MOBILE BUTTONS ---------- */
-function button(label, x, y, onDown, onUp){
-  const b = document.createElement("button");
-  b.textContent = label;
-  b.style.position="fixed";
-  b.style.left = x;
-  b.style.bottom = y;
-  b.style.width="60px";
-  b.style.height="60px";
-  b.ontouchstart=onDown;
-  b.ontouchend=onUp;
+/* Buttons */
+function btn(txt,x,y,down,up){
+  const b=document.createElement("button");
+  b.textContent=txt;
+  b.style.left=x;
+  b.style.bottom=y;
+  b.ontouchstart=down;
+  b.ontouchend=up;
   document.body.appendChild(b);
 }
-button("↑","80px","120px",()=>move.f=1,()=>move.f=0);
-button("↓","80px","20px",()=>move.b=1,()=>move.b=0);
-button("←","20px","70px",()=>move.l=1,()=>move.l=0);
-button("→","140px","70px",()=>move.r=1,()=>move.r=0);
-button("⤒","300px","70px",()=>{if(canJump){velocity.y=0.35;canJump=false;}},()=>{});
+btn("↑","80px","120px",()=>move.f=1,()=>move.f=0);
+btn("↓","80px","20px",()=>move.b=1,()=>move.b=0);
+btn("←","20px","70px",()=>move.l=1,()=>move.l=0);
+btn("→","140px","70px",()=>move.r=1,()=>move.r=0);
+btn("⤒","300px","70px",()=>{
+  if(canJump){
+    velocityY = 0.35;
+    canJump = false;
+  }
+},()=>{});
 
-/* ---------- WINDOW RESIZE ---------- */
-window.addEventListener("resize",()=>{
-  camera.aspect = window.innerWidth/window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+/* Touch look */
+let lastX=0,lastY=0;
+document.addEventListener("touchstart",e=>{
+  lastX=e.touches[0].clientX;
+  lastY=e.touches[0].clientY;
+});
+document.addEventListener("touchmove",e=>{
+  const dx=e.touches[0].clientX-lastX;
+  const dy=e.touches[0].clientY-lastY;
+  lastX=e.touches[0].clientX;
+  lastY=e.touches[0].clientY;
+
+  yawObject.rotation.y -= dx*0.003;
+  pitchObject.rotation.x -= dy*0.003;
+  pitchObject.rotation.x = Math.max(
+    -Math.PI/2,
+    Math.min(Math.PI/2,pitchObject.rotation.x)
+  );
 });
 
-/* ---------- GAME LOOP ---------- */
+/* Resize */
+window.addEventListener("resize",()=>{
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+});
+
+/* ================== GAME LOOP ================== */
 function animate(){
   requestAnimationFrame(animate);
 
-  // Move relative to look
-  const direction = new THREE.Vector3();
-  const forward = new THREE.Vector3(0,0,-1).applyEuler(player.rotation);
-  const right = new THREE.Vector3(1,0,0).applyEuler(player.rotation);
-  direction.add(forward.clone().multiplyScalar(move.f - move.b));
-  direction.add(right.clone().multiplyScalar(move.r - move.l));
-  direction.multiplyScalar(0.08);
-  player.position.add(direction);
+  /* Movement relative to view */
+  const forward = new THREE.Vector3(0,0,-1).applyQuaternion(yawObject.quaternion);
+  const right = new THREE.Vector3(1,0,0).applyQuaternion(yawObject.quaternion);
+  const moveVec = new THREE.Vector3();
+  moveVec.addScaledVector(forward, move.f - move.b);
+  moveVec.addScaledVector(right, move.r - move.l);
+  moveVec.normalize().multiplyScalar(0.08);
+  player.position.add(moveVec);
 
-  // Gravity
-  velocity.y -= 0.02;
-  player.position.y += velocity.y;
+  /* Gravity */
+  velocityY -= 0.02;
+  player.position.y += velocityY;
 
-  // Collision (player bounding box)
-  const playerBottom = player.position.y - playerHeight/2;
+  /* Collision (floor) */
+  const bottom = player.position.y - PLAYER_HEIGHT/2;
   canJump = false;
-  for(const block of world){
-    const bx = block.position.x;
-    const by = block.position.y;
-    const bz = block.position.z;
-    const onX = Math.abs(player.position.x - bx) < 0.5;
-    const onZ = Math.abs(player.position.z - bz) < 0.5;
-    const blockTop = by + 0.5;
-
-    if(onX && onZ && velocity.y <=0){
-      if(playerBottom <= blockTop && playerBottom >= blockTop - 0.3){
-        player.position.y = blockTop + playerHeight/2;
-        velocity.y = 0;
+  for(const b of world){
+    if(
+      Math.abs(player.position.x - b.position.x) < 0.5 &&
+      Math.abs(player.position.z - b.position.z) < 0.5
+    ){
+      const top = b.position.y + 0.5;
+      if(bottom <= top && bottom >= top-0.3 && velocityY<=0){
+        player.position.y = top + PLAYER_HEIGHT/2;
+        velocityY = 0;
         canJump = true;
       }
     }
   }
 
-  // Camera follows player eyes
-  camera.position.set(player.position.x, player.position.y + playerHeight/2 - 0.1, player.position.z);
+  /* Sync camera rig */
+  yawObject.position.copy(player.position);
 
   renderer.render(scene,camera);
 }
-
 animate();
 </script>
 </body>
