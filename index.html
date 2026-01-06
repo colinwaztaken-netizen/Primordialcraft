@@ -166,20 +166,37 @@ function animate(){
     camera.position.y += velocity.y;
 
     // Collision (vertical)
-    const playerBottom = camera.position.y - playerHeight/2;
-    canJump = false;
-    for(let block of world){
-        const dx = Math.abs(camera.position.x - block.position.x);
-        const dz = Math.abs(camera.position.z - block.position.z);
-        if(dx < 0.5 && dz < 0.5){
-            const blockTop = block.position.y + blockSize/2;
-            if(playerBottom <= blockTop && playerBottom >= blockTop - 0.1 && velocity.y <= 0){
-                camera.position.y = blockTop + playerHeight/2 + 0.01;
-                velocity.y = 0;
-                canJump = true;
-            }
+    // Collision (player box)
+const playerBottom = camera.position.y - playerHeight/2;
+const playerTop = camera.position.y + playerHeight/2;
+const playerMinX = camera.position.x - 0.5;
+const playerMaxX = camera.position.x + 0.5;
+const playerMinZ = camera.position.z - 0.5;
+const playerMaxZ = camera.position.z + 0.5;
+
+canJump = false;
+
+for (let block of world) {
+    const blockMinX = block.position.x - blockSize/2;
+    const blockMaxX = block.position.x + blockSize/2;
+    const blockMinY = block.position.y - blockSize/2;
+    const blockMaxY = block.position.y + blockSize/2;
+    const blockMinZ = block.position.z - blockSize/2;
+    const blockMaxZ = block.position.z + blockSize/2;
+
+    // Check XZ overlap
+    const overlapX = playerMaxX > blockMinX && playerMinX < blockMaxX;
+    const overlapZ = playerMaxZ > blockMinZ && playerMinZ < blockMaxZ;
+
+    if (overlapX && overlapZ) {
+        // Check if falling onto block
+        if (playerBottom <= blockMaxY && playerBottom >= blockMaxY - 0.2 && velocity.y <= 0) {
+            camera.position.y = blockMaxY + playerHeight/2 + 0.01;
+            velocity.y = 0;
+            canJump = true;
         }
     }
+}
 
     renderer.render(scene,camera);
 }
